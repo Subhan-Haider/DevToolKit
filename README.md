@@ -40,7 +40,7 @@ pyinstaller devtoolkit.spec --noconfirm
 ./dist/devtoolkit --help
 ```
 
-## 16 Tools Included
+## 17 Tools Included
 
 ### 1. File Organizer — `organize`
 Automatically sorts files into folders by type (Images, Documents, Code, etc.)
@@ -339,6 +339,14 @@ python -m devtoolkit ai chat -m mistral -p "Write a haiku about coding"
 
 > **Requires:** [Ollama](https://ollama.com/download) installed and running (`ollama serve`). Uses `urllib` — zero extra Python dependencies.
 
+### 17. Desktop UI - `ui`
+Run DevToolKit from a desktop app powered by Tkinter.
+
+```bash
+# Launch the UI
+python -m devtoolkit ui
+```
+
 ## Project Structure
 
 ```
@@ -416,6 +424,7 @@ python -m devtoolkit ai chat -m mistral -p "Write a haiku about coding"
 | File diff | `diff A B` | `-s` `--html` `--stats` |
 | Lorem ipsum | `lorem` | `-w 50` `-p 5` `-f html` `--copy` |
 | AI assistant | `ai chat/ask/review` | `-m model` `-p prompt` `-f file` `--explain` |
+| Desktop UI | `ui` | Launch graphical runner |
 
 > Tip: Every tool supports `--help` for full usage details.
 

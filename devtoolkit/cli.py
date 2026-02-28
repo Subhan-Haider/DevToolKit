@@ -29,6 +29,7 @@ TOOLS = {
     "diff":      "Compare two files and show differences",
     "lorem":     "Generate placeholder text (Lorem Ipsum)",
     "ai":        "AI assistant powered by Ollama (local LLM)",
+    "ui":        "Launch desktop GUI for running DevToolKit tools",
 }
 
 
@@ -84,6 +85,8 @@ def main(argv=None):
         from devtoolkit.tools.lorem import run
     elif tool == "ai":
         from devtoolkit.tools.ai_chat import run
+    elif tool == "ui":
+        from devtoolkit.ui import run
     else:
         print(f"  Unknown tool: '{tool}'. Run with --help to see available tools.")
         return 1
