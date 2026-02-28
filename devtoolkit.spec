@@ -37,6 +37,7 @@ a = Analysis(
         'devtoolkit.tools.encoder',
         'devtoolkit.tools.file_diff',
         'devtoolkit.tools.lorem',
+        'devtoolkit.tools.ai_chat',
     ],
     hookspath=[],
     hooksconfig={},

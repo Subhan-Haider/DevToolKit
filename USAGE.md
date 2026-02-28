@@ -24,6 +24,7 @@ A hands-on guide covering every tool, every flag, and real-world recipes.
    - [encode — Encode/decode text](#13-encode)
    - [diff — Compare files](#14-diff)
    - [lorem — Placeholder text](#15-lorem)
+   - [ai — AI assistant (Ollama)](#16-ai)
 4. [Workflow Recipes](#workflow-recipes)
 5. [GitHub Actions Usage](#github-actions-usage)
 6. [Tips & Tricks](#tips--tricks)
@@ -566,6 +567,86 @@ python -m devtoolkit lorem --paragraphs 10 --format html --output content.html
 
 ---
 
+### 16. ai
+
+AI assistant powered by [Ollama](https://ollama.com) — runs 100% locally.
+
+**Setup:**
+```bash
+# 1. Install Ollama: https://ollama.com/download
+# 2. Start the server
+ollama serve
+
+# 3. Pull a model
+python -m devtoolkit ai pull llama3
+```
+
+**Subcommands:**
+
+```bash
+# List available models
+python -m devtoolkit ai models
+
+# Pull / download a model
+python -m devtoolkit ai pull mistral
+python -m devtoolkit ai pull codellama
+python -m devtoolkit ai pull llama3
+
+# Interactive chat
+python -m devtoolkit ai chat
+python -m devtoolkit ai chat -m mistral
+python -m devtoolkit ai chat -s "You are a helpful Python tutor"
+
+# Single prompt (non-interactive)
+python -m devtoolkit ai chat -p "Explain async/await in Python"
+
+# Ask a question (optionally with file context)
+python -m devtoolkit ai ask "What is a binary search tree?"
+python -m devtoolkit ai ask "What does this function do?" -f utils.py
+
+# Summarise files
+python -m devtoolkit ai summarize README.md
+python -m devtoolkit ai summarize src/main.py src/utils.py
+
+# Code review
+python -m devtoolkit ai review app.py
+
+# Explain code (instead of review)
+python -m devtoolkit ai review app.py --explain
+
+# Generate code
+python -m devtoolkit ai generate "merge sort algorithm" --lang python
+python -m devtoolkit ai generate "REST API with Express" --lang javascript -o server.js
+```
+
+**Subcommands:**
+| Command | Description |
+|---------|-------------|
+| `models` | List locally available models |
+| `pull NAME` | Download a model |
+| `chat` | Interactive chat (or single prompt with `-p`) |
+| `ask QUESTION` | Ask a single question |
+| `summarize FILES` | Summarise one or more files |
+| `review FILE` | Code review (or `--explain`) |
+| `generate DESC` | Generate code from description |
+
+**Flags:**
+| Flag | Description |
+|------|-------------|
+| `-m MODEL` | Model name (default: `llama3`) |
+| `-p PROMPT` | Single prompt for chat |
+| `-s SYSTEM` | System prompt to set AI behaviour |
+| `-f FILE` | Include file as context (`ask` command) |
+| `--explain` | Explain instead of review |
+| `-l LANG` | Language for code generation |
+| `-o FILE` | Save generated code to file |
+
+**Chat commands:** `/quit`, `/clear`, `/model`
+
+**Environment:** Set `OLLAMA_HOST` to use a remote server (default: `http://localhost:11434`)
+
+---
+
 ## Workflow Recipes
 
 ### Recipe 1: Clean up a messy Downloads folder
@@ -708,7 +789,7 @@ DevToolKit ships with **9 GitHub Actions workflows** that automate common tasks.
 
 | Workflow | File | Trigger | Purpose |
 |----------|------|---------|---------|
-| **CI** | `ci.yml` | Push / PR | Lint + test all 15 tools across 15 environments |
+| **CI** | `ci.yml` | Push / PR | Lint + test all 16 tools across 15 environments |
 | **Release** | `release.yml` | Version tag | Create GitHub Release with changelog |
 | **Build EXE** | `build-exe.yml` | Version tag | Build standalone executables (Win/Mac/Linux) |
 | **Scheduled Scan** | `scheduled-scan.yml` | Weekly (Mon) | Find TODOs, debug prints, duplicates |
@@ -843,4 +924,4 @@ E:\devtoolkit.exe serve D:\shared-files --port 9000
 
 ---
 
-*Generated for DevToolKit v1.0.0 — 15 tools, zero dependencies, pure Python.*
+*Generated for DevToolKit v1.0.0 — 16 tools, zero dependencies, pure Python.*

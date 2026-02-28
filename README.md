@@ -40,7 +40,7 @@ pyinstaller devtoolkit.spec --noconfirm
 ./dist/devtoolkit --help
 ```
 
-## 15 Tools Included
+## 16 Tools Included
 
 ### 1. File Organizer — `organize`
 Automatically sorts files into folders by type (Images, Documents, Code, etc.)
@@ -302,6 +302,43 @@ python -m devtoolkit lorem --paragraphs 10 --output placeholder.txt
 python -m devtoolkit lorem --words 100 --copy
 ```
 
+### 16. AI Assistant — `ai` (Ollama)
+Chat with local AI models, summarise files, review code, and generate code — all offline via [Ollama](https://ollama.com).
+
+```bash
+# List local models
+python -m devtoolkit ai models
+
+# Pull a model
+python -m devtoolkit ai pull llama3
+
+# Interactive chat
+python -m devtoolkit ai chat
+
+# Single prompt
+python -m devtoolkit ai chat -p "Explain Python decorators"
+
+# Ask a question with file context
+python -m devtoolkit ai ask "What does this do?" -f main.py
+
+# Summarise files
+python -m devtoolkit ai summarize README.md src/app.py
+
+# Code review
+python -m devtoolkit ai review app.py
+
+# Explain code
+python -m devtoolkit ai review app.py --explain
+
+# Generate code and save to file
+python -m devtoolkit ai generate "REST API with Flask" -o server.py
+
+# Use a specific model
+python -m devtoolkit ai chat -m mistral -p "Write a haiku about coding"
+```
+
+> **Requires:** [Ollama](https://ollama.com/download) installed and running (`ollama serve`). Uses `urllib` — zero extra Python dependencies.
+
 ## Project Structure
 
 ```
@@ -325,7 +362,8 @@ python -m devtoolkit lorem --words 100 --copy
 │       ├── snippet_mgr.py       # snippet
 │       ├── encoder.py           # encode
 │       ├── file_diff.py         # diff
-│       └── lorem.py             # lorem
+│       ├── lorem.py             # lorem
+│       └── ai_chat.py           # ai (Ollama)
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml               # CI tests (15 jobs)
@@ -377,6 +415,7 @@ python -m devtoolkit lorem --words 100 --copy
 | Encode/Decode | `encode FMT TEXT` | `-d` `--list` `-f` |
 | File diff | `diff A B` | `-s` `--html` `--stats` |
 | Lorem ipsum | `lorem` | `-w 50` `-p 5` `-f html` `--copy` |
+| AI assistant | `ai chat/ask/review` | `-m model` `-p prompt` `-f file` `--explain` |
 
 > Tip: Every tool supports `--help` for full usage details.
 
@@ -603,7 +642,7 @@ DevToolKit ships with **9 GitHub Actions workflows** in `.github/workflows/`:
 
 | # | Workflow | File | Trigger | Purpose |
 |---|----------|------|---------|---------|
-| 1 | **CI** | `ci.yml` | Push / PR | Lint + test all 15 tools on 15 environments |
+| 1 | **CI** | `ci.yml` | Push / PR | Lint + test all 16 tools on 15 environments |
 | 2 | **Release** | `release.yml` | `v*.*.*` tag | Create GitHub Release with archives |
 | 3 | **Build EXE** | `build-exe.yml` | `v*.*.*` tag / manual | Build Win/Mac/Linux executables |
 | 4 | **Scheduled Scan** | `scheduled-scan.yml` | Weekly (Mon 8am) | Find TODOs, debug prints, duplicates |
@@ -614,7 +653,7 @@ DevToolKit ships with **9 GitHub Actions workflows** in `.github/workflows/`:
 | 9 | **Data Processing** | `data-processing.yml` | Manual | Convert data, generate content, hash files |
 
 ### 1. CI — `ci.yml`
-Runs on every push and pull request. Tests all 15 tools across Python 3.10–3.14 × Ubuntu, Windows, macOS (15 environments).
+Runs on every push and pull request. Tests all 16 tools across Python 3.10–3.14 × Ubuntu, Windows, macOS (15 environments).
 
 ### 2. Release — `release.yml`
 Creates a GitHub Release when you push a version tag:
