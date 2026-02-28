@@ -1,0 +1,65 @@
+name: Auto-Organize Uploads
+
+# This workflow demonstrates using DevToolKit to automatically organize
+# files uploaded to a specific directory via PR.
+# Customize the trigger path to match your project structure.
+
+on:
+  pull_request:
+    paths:
+      - "uploads/**"
+      - "assets/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  organize-uploads:
+    name: Organize Uploaded Files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Preview organization (dry run)
+        run: |
+          echo "## File Organization Preview" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          if [ -d "uploads" ]; then
+            python -m devtoolkit organize uploads --dry-run 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          fi
+          if [ -d "assets" ]; then
+            python -m devtoolkit organize assets --dry-run 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          fi
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Check for duplicates in uploads
+        run: |
+          echo "## Duplicate Check" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          if [ -d "uploads" ]; then
+            python -m devtoolkit dupes uploads 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          fi
+          if [ -d "assets" ]; then
+            python -m devtoolkit dupes assets 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          fi
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Hash all uploaded files
+        run: |
+          echo "## File Hashes" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          find uploads assets -type f 2>/dev/null | sort | while read f; do
+            python -m devtoolkit hash "$f" 2>&1 | grep -E "File:|SHA256"
+            echo ""
+          done | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

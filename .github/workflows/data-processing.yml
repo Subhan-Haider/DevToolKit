@@ -1,0 +1,110 @@
+name: Convert & Process Data
+
+# Demonstrates using DevToolKit's convert and other tools
+# to process data files automatically.
+# Trigger manually or customize the trigger for your use case.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        type: choice
+        options:
+          - convert-json-to-csv
+          - convert-csv-to-json
+          - generate-placeholder
+          - generate-passwords
+          - hash-directory
+      input_file:
+        description: "Input file path (for convert actions)"
+        required: false
+        type: string
+      directory:
+        description: "Directory to scan (for hash-directory)"
+        required: false
+        default: "."
+        type: string
+
+jobs:
+  process:
+    name: Process — ${{ github.event.inputs.action }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Convert JSON to CSV
+        if: github.event.inputs.action == 'convert-json-to-csv'
+        run: |
+          INPUT="${{ github.event.inputs.input_file }}"
+          if [ -z "$INPUT" ]; then
+            echo "Error: Please provide an input file path"
+            exit 1
+          fi
+          OUTPUT="${INPUT%.json}.csv"
+          python -m devtoolkit convert "$INPUT" --output "$OUTPUT"
+          echo "## Conversion Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- Input: \`$INPUT\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Output: \`$OUTPUT\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Convert CSV to JSON
+        if: github.event.inputs.action == 'convert-csv-to-json'
+        run: |
+          INPUT="${{ github.event.inputs.input_file }}"
+          if [ -z "$INPUT" ]; then
+            echo "Error: Please provide an input file path"
+            exit 1
+          fi
+          OUTPUT="${INPUT%.csv}.json"
+          python -m devtoolkit convert "$INPUT" --output "$OUTPUT"
+          echo "## Conversion Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- Input: \`$INPUT\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Output: \`$OUTPUT\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate placeholder content
+        if: github.event.inputs.action == 'generate-placeholder'
+        run: |
+          mkdir -p generated
+          python -m devtoolkit lorem --paragraphs 5 --format html --output generated/content.html
+          python -m devtoolkit lorem --paragraphs 3 --format json --output generated/content.json
+          python -m devtoolkit lorem --paragraphs 10 --output generated/content.txt
+          python -m devtoolkit lorem --words 200 --format markdown --output generated/content.md
+          echo "## Generated Files" >> $GITHUB_STEP_SUMMARY
+          ls -lh generated/ >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate secure passwords
+        if: github.event.inputs.action == 'generate-passwords'
+        run: |
+          echo "## Generated Passwords" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          python -m devtoolkit password --count 10 --length 24 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "--- Passphrases ---" >> $GITHUB_STEP_SUMMARY
+          python -m devtoolkit password --passphrase --words 5 --count 5 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Hash all files in directory
+        if: github.event.inputs.action == 'hash-directory'
+        run: |
+          DIR="${{ github.event.inputs.directory }}"
+          echo "## Hash Manifest for \`$DIR\`" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          find "$DIR" -type f -not -path './.git/*' -not -name '*.pyc' | sort | while read f; do
+            python -m devtoolkit hash "$f" 2>&1 | grep "SHA256" | sed "s|^|$f  |"
+          done | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload generated files
+        if: github.event.inputs.action == 'generate-placeholder'
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-content
+          path: generated/
+          retention-days: 7

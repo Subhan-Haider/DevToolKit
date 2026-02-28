@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+*.spec.bak
+
+# PyInstaller
+*.manifest
+*.spec.bak
+dist/
+build/
+
+# DevToolKit local data (don't commit personal data)
+_organize_log.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Test artifacts
+test_organize/
+test_dupes/
+test_a.txt
+test_b.txt
+test_data.json
+test_data.csv
+test_data_back.json
+diff_*.html
+snippets_export.json
+
+# Virtual environments
+.venv/
+venv/
+env/

@@ -1,0 +1,97 @@
+name: Generate Docs & Reports
+
+on:
+  workflow_dispatch:
+    inputs:
+      report_type:
+        description: "Report to generate"
+        required: true
+        type: choice
+        options:
+          - full-report
+          - system-info
+          - code-stats
+          - hash-manifest
+  schedule:
+    # First day of every month at midnight UTC
+    - cron: "0 0 1 * *"
+
+permissions:
+  contents: write
+
+jobs:
+  generate-report:
+    name: Generate Report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Create reports directory
+        run: mkdir -p reports
+
+      - name: System info report
+        if: github.event.inputs.report_type == 'system-info' || github.event.inputs.report_type == 'full-report' || github.event_name == 'schedule'
+        run: |
+          echo "# CI Environment Report — $(date -I)" > reports/system-info.md
+          echo '```json' >> reports/system-info.md
+          python -m devtoolkit sysinfo --json >> reports/system-info.md
+          echo '```' >> reports/system-info.md
+
+      - name: Code statistics report
+        if: github.event.inputs.report_type == 'code-stats' || github.event.inputs.report_type == 'full-report' || github.event_name == 'schedule'
+        run: |
+          echo "# Code Statistics — $(date -I)" > reports/code-stats.md
+          echo "" >> reports/code-stats.md
+
+          echo "## File Counts" >> reports/code-stats.md
+          echo '```' >> reports/code-stats.md
+          echo "Python files: $(find . -name '*.py' | wc -l)" >> reports/code-stats.md
+          echo "YAML files:   $(find . -name '*.yml' -o -name '*.yaml' | wc -l)" >> reports/code-stats.md
+          echo "Markdown:     $(find . -name '*.md' | wc -l)" >> reports/code-stats.md
+          echo "Total lines:  $(find . -name '*.py' -exec cat {} + | wc -l)" >> reports/code-stats.md
+          echo '```' >> reports/code-stats.md
+
+          echo "" >> reports/code-stats.md
+          echo "## TODO/FIXME Comments" >> reports/code-stats.md
+          echo '```' >> reports/code-stats.md
+          python -m devtoolkit search "TODO|FIXME|HACK|XXX" . --regex --ignore-case -e .py --count-only >> reports/code-stats.md 2>&1 || echo "None found" >> reports/code-stats.md
+          echo '```' >> reports/code-stats.md
+
+          echo "" >> reports/code-stats.md
+          echo "## Duplicate Files" >> reports/code-stats.md
+          echo '```' >> reports/code-stats.md
+          python -m devtoolkit dupes . --min-size 100 >> reports/code-stats.md 2>&1
+          echo '```' >> reports/code-stats.md
+
+      - name: Hash manifest (all source files)
+        if: github.event.inputs.report_type == 'hash-manifest' || github.event.inputs.report_type == 'full-report' || github.event_name == 'schedule'
+        run: |
+          echo "# File Hash Manifest — $(date -I)" > reports/hash-manifest.md
+          echo "" >> reports/hash-manifest.md
+          echo "SHA-256 hashes for all Python source files:" >> reports/hash-manifest.md
+          echo '```' >> reports/hash-manifest.md
+          find . -name '*.py' -not -path './__pycache__/*' | sort | while read f; do
+            python -m devtoolkit hash "$f" --algo sha256 2>&1 | grep "SHA256" | sed "s|^|$f  |"
+          done >> reports/hash-manifest.md
+          echo '```' >> reports/hash-manifest.md
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: devtoolkit-reports-${{ github.run_number }}
+          path: reports/
+          retention-days: 90
+
+      - name: Post summary
+        run: |
+          echo "## Reports Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for f in reports/*.md; do
+            echo "- $(basename $f)" >> $GITHUB_STEP_SUMMARY
+          done

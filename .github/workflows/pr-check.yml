@@ -1,0 +1,63 @@
+name: PR — File Size & Duplicate Check
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  analyze-pr:
+    name: Analyze Pull Request
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for diff
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Find duplicate files in repo
+        run: |
+          echo "## Duplicate File Check" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          python -m devtoolkit dupes . --min-size 100 2>&1 | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Find TODO/FIXME in changed files
+        run: |
+          echo "## TODO/FIXME Comments" >> $GITHUB_STEP_SUMMARY
+          CHANGED=$(git diff --name-only origin/main...HEAD -- '*.py')
+          if [ -n "$CHANGED" ]; then
+            for f in $CHANGED; do
+              if [ -f "$f" ]; then
+                python -m devtoolkit search "TODO|FIXME|HACK|XXX" "$f" --regex --ignore-case --count-only 2>&1 || true
+              fi
+            done | tee -a $GITHUB_STEP_SUMMARY
+          else
+            echo "No Python files changed." | tee -a $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Search for hardcoded secrets patterns
+        run: |
+          echo "## Hardcoded Secrets Scan" >> $GITHUB_STEP_SUMMARY
+          echo "Scanning for potential hardcoded secrets..." >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          python -m devtoolkit search "password\s*=\s*['\"]|api_key\s*=\s*['\"]|secret\s*=\s*['\"]|token\s*=\s*['\"]" . --regex --ignore-case -e .py -e .js -e .ts -e .env --count-only 2>&1 | tee -a $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Diff summary of changed Python files
+        run: |
+          echo "## Changed Files Diff Stats" >> $GITHUB_STEP_SUMMARY
+          CHANGED=$(git diff --name-only origin/main...HEAD -- '*.py')
+          if [ -n "$CHANGED" ]; then
+            for f in $CHANGED; do
+              if [ -f "$f" ]; then
+                # Compare with base branch
+                git show origin/main:"$f" > /tmp/old_file 2>/dev/null || echo "" > /tmp/old_file
+                python -m devtoolkit diff /tmp/old_file "$f" --stats 2>&1 || true
+              fi
+            done | tee -a $GITHUB_STEP_SUMMARY
+          fi

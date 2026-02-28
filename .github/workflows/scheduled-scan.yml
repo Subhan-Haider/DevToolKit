@@ -1,0 +1,44 @@
+name: Weekly Code Scan
+
+on:
+  schedule:
+    # Run every Monday at 8:00 AM UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  scan:
+    name: Code Quality Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Search for TODO/FIXME comments
+        run: |
+          echo "=== TODO/FIXME/HACK/XXX comments ==="
+          python -m devtoolkit search "TODO|FIXME|HACK|XXX" . --regex --ignore-case --count-only -e .py || true
+
+      - name: Check for debug prints
+        run: |
+          echo "=== Debug print() statements in source ==="
+          python -m devtoolkit search "print(" ./devtoolkit -e .py --count-only || true
+
+      - name: Scan for duplicate files
+        run: |
+          echo "=== Duplicate files ==="
+          python -m devtoolkit dupes . --min-size 100
+
+      - name: Compile all modules (syntax check)
+        run: |
+          echo "=== Syntax check ==="
+          python -m py_compile devtoolkit/cli.py
+          for f in devtoolkit/tools/*.py; do
+            python -m py_compile "$f"
+            echo "  OK: $f"
+          done
+
+      - name: System info snapshot
+        run: python -m devtoolkit sysinfo

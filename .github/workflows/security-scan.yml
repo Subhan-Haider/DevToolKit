@@ -1,0 +1,76 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Every Wednesday at 3:00 AM UTC
+    - cron: "0 3 * * 3"
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    name: Security & Code Quality Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Scan for hardcoded credentials
+        run: |
+          echo "## Credential Scan" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "Scanning for potential hardcoded passwords, API keys, tokens..."
+          python -m devtoolkit search "password\s*[=:]\s*['\"][^'\"]+['\"]" . --regex --ignore-case -e .py -e .js -e .ts -e .yaml -e .yml -e .json -e .env -e .cfg -e .ini --count-only 2>&1 | tee -a $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+          python -m devtoolkit search "api[_-]?key\s*[=:]\s*['\"][^'\"]+['\"]" . --regex --ignore-case -e .py -e .js -e .env --count-only 2>&1 | tee -a $GITHUB_STEP_SUMMARY || true
+          echo "" >> $GITHUB_STEP_SUMMARY
+          python -m devtoolkit search "secret\s*[=:]\s*['\"][^'\"]+['\"]" . --regex --ignore-case -e .py -e .js -e .env --count-only 2>&1 | tee -a $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Scan for dangerous functions
+        run: |
+          echo "## Dangerous Function Scan" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "Scanning for eval(), exec(), os.system()..."
+          python -m devtoolkit search "eval\(|exec\(|os\.system\(|subprocess\.call\(.*shell\s*=\s*True" . --regex -e .py --count-only 2>&1 | tee -a $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Scan for debug leftovers
+        run: |
+          echo "## Debug Leftover Scan" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "Scanning for breakpoint(), pdb, print() debug statements..."
+          python -m devtoolkit search "breakpoint\(\)|import\s+pdb|pdb\.set_trace" . --regex -e .py --count-only 2>&1 | tee -a $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Check for large files
+        run: |
+          echo "## Large File Check" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "Files larger than 1MB:"
+          find . -type f -size +1M -not -path './.git/*' -exec ls -lh {} \; 2>&1 | tee -a $GITHUB_STEP_SUMMARY || echo "None found" | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Verify file integrity (hash manifest)
+        run: |
+          echo "## Source File Hashes" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          for f in devtoolkit/*.py devtoolkit/tools/*.py; do
+            HASH=$(python -m devtoolkit hash "$f" 2>&1 | grep "SHA256" | awk '{print $2}')
+            echo "$HASH  $f" | tee -a $GITHUB_STEP_SUMMARY
+          done
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Summary
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "Scan completed at $(date -u)" >> $GITHUB_STEP_SUMMARY

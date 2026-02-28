@@ -1,0 +1,106 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Pre-release Tests
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Create GitHub Release
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify version tag matches code
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          CODE_VERSION=$(python -c "from devtoolkit import __version__; print(__version__)")
+          echo "Tag version: $TAG_VERSION"
+          echo "Code version: $CODE_VERSION"
+          if [ "$TAG_VERSION" != "$CODE_VERSION" ]; then
+            echo "ERROR: Tag version ($TAG_VERSION) does not match code version ($CODE_VERSION)"
+            exit 1
+          fi
+
+      - name: Run smoke test
+        run: |
+          python -m devtoolkit --help
+          python -m devtoolkit password --count 1
+          python -m devtoolkit sysinfo --json
+          python -m devtoolkit hash "release test" --text
+
+      - name: Create release archive
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          zip -r "devtoolkit-${VERSION}.zip" devtoolkit/ README.md LICENSE -x "**/__pycache__/*" "**/*.pyc"
+          tar -czf "devtoolkit-${VERSION}.tar.gz" devtoolkit/ README.md LICENSE --exclude="__pycache__" --exclude="*.pyc"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Generate release notes
+        run: |
+          echo "## DevToolKit ${{ env.VERSION }}" > release_notes.md
+          echo "" >> release_notes.md
+          echo "### Downloads" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "| Platform | File | Requires Python? |" >> release_notes.md
+          echo "|----------|------|-----------------|" >> release_notes.md
+          echo "| Windows | \`devtoolkit-windows-x64.exe\` | No (standalone) |" >> release_notes.md
+          echo "| Linux | \`devtoolkit-linux-x64\` | No (standalone) |" >> release_notes.md
+          echo "| macOS | \`devtoolkit-macos-arm64\` | No (standalone) |" >> release_notes.md
+          echo "| Any | \`devtoolkit-${{ env.VERSION }}.zip\` | Python 3.10+ |" >> release_notes.md
+          echo "| Any | \`devtoolkit-${{ env.VERSION }}.tar.gz\` | Python 3.10+ |" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Standalone .exe Usage (no Python needed)" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo "# Windows" >> release_notes.md
+          echo "devtoolkit.exe --help" >> release_notes.md
+          echo "devtoolkit.exe password --count 3" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "# Linux / macOS" >> release_notes.md
+          echo "chmod +x devtoolkit-linux-x64" >> release_notes.md
+          echo "./devtoolkit-linux-x64 --help" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Python Source Usage" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo "unzip devtoolkit-${{ env.VERSION }}.zip" >> release_notes.md
+          echo "python -m devtoolkit --help" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Requirements (source only)" >> release_notes.md
+          echo "- Python 3.10+" >> release_notes.md
+          echo "- Zero external dependencies" >> release_notes.md
+          echo "" >> release_notes.md
+          echo "### Tools Included" >> release_notes.md
+          python -c "
+          from devtoolkit.cli import TOOLS
+          for name, desc in TOOLS.items():
+              print(f'- **{name}** — {desc}')
+          " >> release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release_notes.md
+          files: |
+            devtoolkit-${{ env.VERSION }}.zip
+            devtoolkit-${{ env.VERSION }}.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

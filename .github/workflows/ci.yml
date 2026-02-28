@@ -1,0 +1,185 @@
+name: CI — Test All Tools
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Verify Python version
+        run: python --version
+
+      - name: Verify CLI loads
+        run: python -m devtoolkit --help
+
+      - name: Test — Password Generator
+        run: python -m devtoolkit password --count 2 --length 16
+
+      - name: Test — Password (passphrase mode)
+        run: python -m devtoolkit password --passphrase --words 4 --count 2
+
+      - name: Test — System Info
+        run: python -m devtoolkit sysinfo
+
+      - name: Test — System Info (JSON)
+        run: python -m devtoolkit sysinfo --json
+
+      - name: Test — Hash (text)
+        run: python -m devtoolkit hash "CI test string" --text --all
+
+      - name: Test — Hash (file)
+        run: python -m devtoolkit hash README.md --all
+
+      - name: Test — Timestamp (current)
+        run: python -m devtoolkit timestamp
+
+      - name: Test — Timestamp (parse)
+        run: python -m devtoolkit timestamp "2024-06-15"
+
+      - name: Test — Timestamp (diff)
+        run: python -m devtoolkit timestamp --diff "2024-01-01" "2025-01-01"
+
+      - name: Test — Encoder (base64)
+        run: |
+          python -m devtoolkit encode base64 "Hello GitHub Actions"
+          python -m devtoolkit encode base64 "SGVsbG8gR2l0SHViIEFjdGlvbnM=" --decode
+
+      - name: Test — Encoder (url)
+        run: python -m devtoolkit encode url "hello world & more=true"
+
+      - name: Test — Encoder (hex)
+        run: python -m devtoolkit encode hex "test"
+
+      - name: Test — Encoder (list formats)
+        run: python -m devtoolkit encode --list
+
+      - name: Test — Text Search
+        run: python -m devtoolkit search "def run" . -e .py --count-only
+
+      - name: Test — Text Search (regex)
+        run: python -m devtoolkit search "import\s+\w+" . --regex -e .py --count-only
+
+      - name: Test — Regex Tester (cheatsheet)
+        run: python -m devtoolkit regex --cheatsheet
+
+      - name: Test — Regex Tester (match)
+        run: python -m devtoolkit regex email "test@example.com" --global
+
+      - name: Test — Lorem Ipsum
+        run: python -m devtoolkit lorem --paragraphs 2
+
+      - name: Test — Lorem (words mode)
+        run: python -m devtoolkit lorem --words 20
+
+      - name: Test — Lorem (HTML format)
+        run: python -m devtoolkit lorem --paragraphs 1 --format html
+
+      - name: Test — Todo Manager
+        run: |
+          python -m devtoolkit todo add "CI test task" --priority high --tag ci
+          python -m devtoolkit todo add "Another task" --priority low
+          python -m devtoolkit todo list
+          python -m devtoolkit todo done 1
+          python -m devtoolkit todo list --all
+          python -m devtoolkit todo clear
+
+      - name: Test — Snippet Manager
+        run: |
+          python -m devtoolkit snippet add "ci-test" --file README.md --tag test --desc "CI test snippet"
+          python -m devtoolkit snippet list
+          python -m devtoolkit snippet get "ci-test"
+          python -m devtoolkit snippet search "ci"
+          python -m devtoolkit snippet remove "ci-test"
+
+      - name: Test — File Organizer (dry run)
+        run: |
+          mkdir -p test_organize
+          echo "test" > test_organize/doc.txt
+          echo "test" > test_organize/code.py
+          echo "test" > test_organize/image.png
+          python -m devtoolkit organize test_organize --dry-run
+        shell: bash
+
+      - name: Test — Duplicate Finder
+        run: |
+          mkdir -p test_dupes
+          echo "duplicate content" > test_dupes/file1.txt
+          echo "duplicate content" > test_dupes/file2.txt
+          echo "unique content" > test_dupes/file3.txt
+          python -m devtoolkit dupes test_dupes
+        shell: bash
+
+      - name: Test — File Diff
+        run: |
+          echo -e "line1\nline2\nline3" > test_a.txt
+          echo -e "line1\nmodified\nline3\nline4" > test_b.txt
+          python -m devtoolkit diff test_a.txt test_b.txt
+          python -m devtoolkit diff test_a.txt test_b.txt --stats
+        shell: bash
+
+      - name: Test — JSON/CSV Converter
+        run: |
+          echo '[{"name":"Alice","age":30},{"name":"Bob","age":25}]' > test_data.json
+          python -m devtoolkit convert test_data.json --output test_data.csv
+          python -m devtoolkit convert test_data.csv --output test_data_back.json
+        shell: bash
+
+      - name: All tools verified
+        run: echo "All 15 tools passed on Python ${{ matrix.python-version }} / ${{ matrix.os }}"
+
+  lint:
+    name: Lint & Style Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check syntax (compile all .py files)
+        run: python -m py_compile devtoolkit/cli.py
+
+      - name: Compile all tool modules
+        run: |
+          for f in devtoolkit/tools/*.py; do
+            echo "Compiling $f..."
+            python -m py_compile "$f"
+          done
+
+      - name: Verify no import errors
+        run: |
+          python -c "from devtoolkit.cli import main; print('CLI imports OK')"
+          python -c "from devtoolkit.tools.file_organizer import run; print('organize OK')"
+          python -c "from devtoolkit.tools.duplicate_finder import run; print('dupes OK')"
+          python -c "from devtoolkit.tools.password_gen import run; print('password OK')"
+          python -c "from devtoolkit.tools.converter import run; print('convert OK')"
+          python -c "from devtoolkit.tools.text_search import run; print('search OK')"
+          python -c "from devtoolkit.tools.sysinfo import run; print('sysinfo OK')"
+          python -c "from devtoolkit.tools.todo_manager import run; print('todo OK')"
+          python -c "from devtoolkit.tools.hash_calc import run; print('hash OK')"
+          python -c "from devtoolkit.tools.timestamp import run; print('timestamp OK')"
+          python -c "from devtoolkit.tools.http_server import run; print('serve OK')"
+          python -c "from devtoolkit.tools.regex_tester import run; print('regex OK')"
+          python -c "from devtoolkit.tools.snippet_mgr import run; print('snippet OK')"
+          python -c "from devtoolkit.tools.encoder import run; print('encode OK')"
+          python -c "from devtoolkit.tools.file_diff import run; print('diff OK')"
+          python -c "from devtoolkit.tools.lorem import run; print('lorem OK')"
